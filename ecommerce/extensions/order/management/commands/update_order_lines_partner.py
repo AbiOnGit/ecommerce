@@ -6,6 +6,8 @@ from textwrap import dedent
 from django.core.management.base import BaseCommand, CommandError
 from oscar.core.loading import get_model
 
+from .prompt import query_yes_no
+
 logger = logging.getLogger(__name__)
 OrderLine = get_model('order', 'Line')
 Partner = get_model('partner', 'Partner')
@@ -20,6 +22,7 @@ class Command(BaseCommand):
         ./manage.py update_order_lines_partner <SKU 1> <SKU 2> ... --partner edX
     """
     help = dedent(__doc__)
+    CONFIRMATION_PROMPT = u"You're going to update {count} order lines. Do you want to continue?"
 
     def add_arguments(self, parser):
         parser.add_argument('skus',
@@ -50,4 +53,11 @@ class Command(BaseCommand):
             logger.exception(msg)
             raise CommandError(msg)
 
-        OrderLine.objects.filter(partner_sku__in=skus).update(partner=partner, partner_name=partner.name)
+        order_lines = OrderLine.objects.filter(partner_sku__in=skus).exclude(partner=partner)
+        count = len(order_lines)
+        if query_yes_no(self.CONFIRMATION_PROMPT.format(count=count), default="no"):
+            order_lines.update(partner=partner, partner_name=partner.name)
+            logger.info('%d order lines updated.', count)
+        else:
+            logger.info('Operation canceled.')
+            return
