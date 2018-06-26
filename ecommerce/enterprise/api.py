@@ -2,10 +2,12 @@
 Methods for fetching enterprise API data.
 """
 import logging
+import backoff
 from urllib import urlencode
 
 from django.conf import settings
-from requests.exceptions import ConnectionError, Timeout
+from requests.exceptions import ConnectionError, Timeout, RequestException
+
 from slumber.exceptions import SlumberHttpBaseException
 
 from ecommerce.cache_utils.utils import TieredCache
@@ -67,6 +69,10 @@ def fetch_enterprise_learner_entitlements(site, learner_id):
     return entitlements
 
 
+@backoff.on_exception(backoff.expo,
+                      RequestException,
+                      SlumberHttpBaseException,
+                      max_time=30)
 def fetch_enterprise_learner_data(site, user):
     """
     Fetch information related to enterprise and its entitlements from the Enterprise
